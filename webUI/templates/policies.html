@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SDN Firewall — Policies</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+<aside class="sidebar">
+  <div class="sidebar-brand">
+    <div class="brand-icon">🛡️</div>
+    <div class="brand-name">SDN Firewall</div>
+    <div class="brand-sub">OpenFlow 1.3 · Ryu</div>
+  </div>
+  <nav class="sidebar-nav">
+    <div class="nav-section-label">Main Menu</div>
+    <a href="/" class="nav-link"><span class="nav-icon">📊</span> Dashboard</a>
+    <a href="/policies" class="nav-link active"><span class="nav-icon">🔒</span> Policies</a>
+    <a href="/monitoring" class="nav-link"><span class="nav-icon">📡</span> Monitoring</a>
+    <a href="/logs" class="nav-link"><span class="nav-icon">📋</span> Event Logs</a>
+    <a href="/about" class="nav-link"><span class="nav-icon">ℹ️</span> About</a>
+  </nav>
+  <div class="sidebar-footer">
+    <div class="status-dot">
+      <div class="dot" id="ctrlDot"></div>
+      <span id="ctrlText">Checking...</span>
+    </div>
+  </div>
+</aside>
+
+<!-- ── Edit Rule Modal ── -->
+<div class="modal-overlay" id="editModal">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">✏️ Edit Rule</div>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+
+    <div id="modalAlert"></div>
+
+    <div class="form-group" style="margin-bottom:14px">
+      <label class="form-label">Source IP</label>
+      <input type="text" id="editSrc" placeholder="e.g. 10.0.0.1 (blank = any)">
+    </div>
+    <div class="form-group" style="margin-bottom:14px">
+      <label class="form-label">Destination IP</label>
+      <input type="text" id="editDst" placeholder="e.g. 10.0.1.1 (blank = any)">
+    </div>
+    <div class="form-group" style="margin-bottom:14px">
+      <label class="form-label">Protocol</label>
+      <select id="editProto" onchange="toggleEditPorts()">
+        <option value="tcp">TCP</option>
+        <option value="udp">UDP</option>
+        <option value="icmp">ICMP</option>
+      </select>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px" id="editPortsRow">
+      <div class="form-group">
+        <label class="form-label">Source Port</label>
+        <input type="text" id="editSport" placeholder="optional">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Destination Port</label>
+        <input type="text" id="editDport" placeholder="optional">
+      </div>
+    </div>
+    <div class="form-group" style="margin-bottom:14px">
+      <label class="form-label">Action</label>
+      <select id="editAction" onchange="updateEditPriority()">
+        <option value="block">Block</option>
+        <option value="allow">Allow</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Priority</label>
+      <input type="text" id="editPriority" placeholder="e.g. 200">
+    </div>
+
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="saveEdit()">Save Changes</button>
+    </div>
+  </div>
+</div>
+
+<main class="content">
+  <div class="topbar">
+    <span class="topbar-title">Firewall Policies</span>
+    <span class="topbar-meta" id="ruleCounter">Loading...</span>
+  </div>
+
+  <div class="page-body">
+
+    <div class="page-header">
+      <h1 class="page-heading">Security Policies</h1>
+      <p class="page-sub">Define and manage OpenFlow rules applied to all connected switches in real time.</p>
+    </div>
+
+    <!-- Add Rule Form -->
+    <div class="card section">
+      <div class="card-header">
+        <div class="card-title"><span class="card-title-icon">➕</span> Add New Rule</div>
+      </div>
+
+      <div id="formAlert"></div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Source IP</label>
+          <input type="text" id="src" placeholder="e.g. 10.0.0.1">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Destination IP</label>
+          <input type="text" id="dst" placeholder="e.g. 10.0.1.1">
+        </div>
+        <div class="form-group" style="max-width:130px">
+          <label class="form-label">Protocol</label>
+          <select id="proto" onchange="togglePorts()">
+            <option value="tcp">TCP</option>
+            <option value="udp">UDP</option>
+            <option value="icmp">ICMP</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group" id="sportGroup">
+          <label class="form-label">Source Port</label>
+          <input type="text" id="sport" placeholder="optional">
+        </div>
+        <div class="form-group" id="dportGroup">
+          <label class="form-label">Destination Port</label>
+          <input type="text" id="dport" placeholder="optional">
+        </div>
+        <div class="form-group" style="max-width:130px">
+          <label class="form-label">Action</label>
+          <select id="action" onchange="updatePriority()">
+            <option value="block">Block</option>
+            <option value="allow">Allow</option>
+          </select>
+        </div>
+        <div class="form-group" style="max-width:110px">
+          <label class="form-label">Priority</label>
+          <input type="text" id="priority" value="200">
+        </div>
+        <div class="form-group" style="max-width:130px;justify-content:flex-end">
+          <label class="form-label">&nbsp;</label>
+          <button class="btn btn-primary" onclick="addRule()">➕ Add Rule</button>
+        </div>
+      </div>
+
+      <div style="font-size:0.75rem;color:var(--text-muted);margin-top:4px">
+        ⚠ At least one of Source IP or Destination IP is required.
+        Block rules (priority 200) always override Allow rules (priority 100).
+        Ports apply to TCP/UDP only.
+      </div>
+    </div>
+
+    <!-- Rules Table -->
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title"><span class="card-title-icon">📋</span> Active Rules</div>
+        <span id="rulesCount" style="font-family:var(--font-mono);font-size:0.75rem;color:var(--text-muted)">0 rules</span>
+      </div>
+      <div class="table-wrapper">
+        <table>
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Source IP</th>
+              <th>Destination IP</th>
+              <th>Protocol</th>
+              <th>Src Port</th>
+              <th>Dst Port</th>
+              <th>Action</th>
+              <th>Priority</th>
+              <th>Edit</th>
+              <th>Remove</th>
+            </tr>
+          </thead>
+          <tbody id="rulesTable">
+            <tr><td colspan="10">
+              <div class="empty-state">
+                <div class="empty-state-icon">🔒</div>
+                <div class="empty-state-text">No rules defined. Add one above.</div>
+              </div>
+            </td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+</main>
+
+<script src="/static/main.js"></script>
+<script>
+  function togglePorts() {
+    const proto = document.getElementById('proto').value;
+    const show  = proto !== 'icmp';
+    document.getElementById('sportGroup').style.opacity = show ? '1' : '0.4';
+    document.getElementById('dportGroup').style.opacity = show ? '1' : '0.4';
+    if (!show) {
+      document.getElementById('sport').value = '';
+      document.getElementById('dport').value = '';
+    }
+  }
+
+  function updatePriority() {
+    document.getElementById('priority').value =
+      document.getElementById('action').value === 'block' ? '200' : '100';
+  }
+
+  function toggleEditPorts() {
+    const proto = document.getElementById('editProto').value;
+    document.getElementById('editPortsRow').style.opacity = proto !== 'icmp' ? '1' : '0.4';
+    if (proto === 'icmp') {
+      document.getElementById('editSport').value = '';
+      document.getElementById('editDport').value = '';
+    }
+  }
+
+  function updateEditPriority() {
+    document.getElementById('editPriority').value =
+      document.getElementById('editAction').value === 'block' ? '200' : '100';
+  }
+
+  async function checkController() {
+    try {
+        const r = await fetch('/api/health');
+        const d = await r.json();
+        if (d.status === 'online') {
+            document.getElementById('ctrlDot').className    = 'dot';
+            document.getElementById('ctrlText').textContent = 'Controller online';
+        } else { throw new Error(); }
+    } catch {
+        document.getElementById('ctrlDot').className    = 'dot offline';
+        document.getElementById('ctrlText').textContent = 'Controller offline';
+    }
+}
+
+  togglePorts();
+
+  checkController();
+  setInterval(checkController, 5000);
+</script>
+</body>
+</html>

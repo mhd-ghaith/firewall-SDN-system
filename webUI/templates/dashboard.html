@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SDN Firewall — Dashboard</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+<aside class="sidebar">
+  <div class="sidebar-brand">
+    <div class="brand-icon">🛡️</div>
+    <div class="brand-name">SDN Firewall</div>
+    <div class="brand-sub">OpenFlow 1.3 · Ryu</div>
+  </div>
+  <nav class="sidebar-nav">
+    <div class="nav-section-label">Main Menu</div>
+    <a href="/" class="nav-link active"><span class="nav-icon">📊</span> Dashboard</a>
+    <a href="/policies" class="nav-link"><span class="nav-icon">🔒</span> Policies</a>
+    <a href="/monitoring" class="nav-link"><span class="nav-icon">📡</span> Monitoring</a>
+    <a href="/logs" class="nav-link"><span class="nav-icon">📋</span> Event Logs</a>
+    <a href="/about" class="nav-link"><span class="nav-icon">ℹ️</span> About</a>
+  </nav>
+  <div class="sidebar-footer">
+    <div class="status-dot">
+      <div class="dot" id="ctrlDot"></div>
+      <span id="ctrlText">Checking...</span>
+    </div>
+  </div>
+</aside>
+
+<main class="content">
+  <div class="topbar">
+    <span class="topbar-title">Dashboard</span>
+    <span class="topbar-meta" id="lastUpdated">—</span>
+  </div>
+
+  <div class="page-body">
+
+    <div class="page-header">
+      <h1 class="page-heading">Welcome to SDN Firewall</h1>
+      <p class="page-sub">Real-time overview of your network security status.</p>
+    </div>
+
+    <!-- Stats -->
+    <div class="stats-grid">
+      <div class="stat-card blue">
+        <div class="stat-bg-icon">🔒</div>
+        <div class="stat-label">Active Rules</div>
+        <div class="stat-value blue" id="rulesCount">—</div>
+        <div class="stat-sub">Firewall policies loaded</div>
+      </div>
+      <div class="stat-card red">
+        <div class="stat-bg-icon">🚫</div>
+        <div class="stat-label">Blocked Traffic</div>
+        <div class="stat-value red" id="blockedCount">—</div>
+        <div class="stat-sub">Real packets dropped</div>
+      </div>
+      <div class="stat-card green">
+        <div class="stat-bg-icon">✅</div>
+        <div class="stat-label">Controller</div>
+        <div class="stat-value green" style="font-size:1.1rem;padding-top:6px" id="ctrlStatus">Checking...</div>
+        <div class="stat-sub">Ryu · OpenFlow 1.3</div>
+      </div>
+      <div class="stat-card amber">
+        <div class="stat-bg-icon">📋</div>
+        <div class="stat-label">Log Entries</div>
+        <div class="stat-value amber" id="logCount">—</div>
+        <div class="stat-sub">Total security events</div>
+      </div>
+    </div>
+
+    <!-- Two columns -->
+    <div class="grid-2 section">
+
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title"><span class="card-title-icon">🔒</span> Recent Rules</div>
+          <a href="/policies" class="btn btn-ghost btn-sm">View all</a>
+        </div>
+        <div id="recentRulesBody">
+          <div class="empty-state">
+            <div class="empty-state-icon">🔒</div>
+            <div class="empty-state-text">No rules configured yet.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title"><span class="card-title-icon">📋</span> Recent Events</div>
+          <a href="/logs" class="btn btn-ghost btn-sm">View all</a>
+        </div>
+        <div id="recentLogsBody">
+          <div class="empty-state">
+            <div class="empty-state-icon">📋</div>
+            <div class="empty-state-text">No events recorded yet.</div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Traffic Snapshot Line Chart -->
+    <div class="card section">
+      <div class="card-header">
+        <div class="card-title"><span class="card-title-icon">📈</span> Traffic Snapshot</div>
+        <a href="/monitoring" class="btn btn-ghost btn-sm">Full Report</a>
+      </div>
+      <div class="traffic-legend">
+        <div class="legend-item"><div class="legend-dot" style="background:var(--rose)"></div>Blocked Traffic</div>
+        <div class="legend-item"><div class="legend-dot" style="background:var(--blue)"></div>Rule Changes</div>
+      </div>
+      <div style="width:100%;overflow:hidden">
+        <svg id="snapshotSvg" width="100%" height="180" viewBox="0 0 800 180"
+             preserveAspectRatio="none" style="display:block"></svg>
+      </div>
+      <div id="snapshotEmpty" style="text-align:center;padding:32px;color:var(--text-muted);font-size:0.85rem;display:none">
+        No events yet — add rules and test connections to see data here.
+      </div>
+      <div id="snapshotLabels" style="display:flex;justify-content:space-between;padding:4px 0 0;font-family:var(--font-mono);font-size:0.6rem;color:var(--text-muted)"></div>
+    </div>
+
+  </div>
+</main>
+
+<script>
+function protoBadge(p) {
+  const m = {tcp:'badge-tcp',udp:'badge-udp',icmp:'badge-icmp'};
+  return `<span class="badge ${m[p]||'badge-info'}">${p||'any'}</span>`;
+}
+function actionBadge(a) {
+  return a==='block'
+    ? '<span class="badge badge-block">⛔ block</span>'
+    : '<span class="badge badge-allow">✅ allow</span>';
+}
+function eventBadge(e) {
+  if (e==='Traffic Blocked') return `<span class="badge badge-block">⛔ ${e}</span>`;
+  if (e.includes('Rule'))    return `<span class="badge badge-tcp">📋 ${e}</span>`;
+  return `<span class="badge badge-info">${e}</span>`;
+}
+
+function buildLineChart(logs, svgId, emptyId, labelsId, H) {
+  const svg    = document.getElementById(svgId);
+  const empty  = document.getElementById(emptyId);
+  const labels = document.getElementById(labelsId);
+
+  if (!logs.length) {
+    svg.style.display   = 'none';
+    empty.style.display = 'block';
+    labels.innerHTML    = '';
+    return;
+  }
+  svg.style.display   = 'block';
+  empty.style.display = 'none';
+
+  const W = 800;
+  const PL = 8, PR = 8, PT = 16, PB = 20;
+  const chartW = W - PL - PR;
+  const chartH = H - PT - PB;
+
+  const recent = logs.slice(-20);
+  const N      = recent.length;
+  let   cumBlk = 0, cumRule = 0;
+  const seriesBlk = [], seriesRule = [];
+
+  recent.forEach((log, i) => {
+    if (log.event === 'Traffic Blocked') cumBlk++;
+    else cumRule++;
+    seriesBlk.push({  i, v: cumBlk,  t: log.time });
+    seriesRule.push({ i, v: cumRule, t: log.time });
+  });
+
+  const maxVal = Math.max(cumBlk, cumRule, 1);
+  function xPos(i) { return PL + (i / Math.max(N-1,1)) * chartW; }
+  function yPos(v) { return PT + chartH - (v / maxVal) * chartH; }
+
+  function makePath(series, color, fillColor) {
+    if (!series.length) return '';
+    if (series.length === 1) {
+      return `<circle cx="${xPos(0)}" cy="${yPos(series[0].v)}" r="5" fill="${color}"/>`;
+    }
+    let d = `M ${xPos(series[0].i)} ${yPos(series[0].v)}`;
+    for (let k = 1; k < series.length; k++) {
+      const x0 = xPos(series[k-1].i), y0 = yPos(series[k-1].v);
+      const x1 = xPos(series[k].i),   y1 = yPos(series[k].v);
+      const cx = (x0+x1)/2;
+      d += ` C ${cx} ${y0} ${cx} ${y1} ${x1} ${y1}`;
+    }
+    const baseY  = PT + chartH;
+    const fillD  = d + ` L ${xPos(series[series.length-1].i)} ${baseY} L ${xPos(0)} ${baseY} Z`;
+    const dots   = series.map(p =>
+      `<circle cx="${xPos(p.i)}" cy="${yPos(p.v)}" r="4" fill="${color}" stroke="white" stroke-width="2"/>`
+    ).join('');
+    const vals = series.map(p =>
+      `<text x="${xPos(p.i)}" y="${yPos(p.v)-9}" text-anchor="middle"
+        font-family="JetBrains Mono,monospace" font-size="9" fill="${color}" font-weight="600">${p.v}</text>`
+    ).join('');
+    return `
+      <path d="${fillD}" fill="${fillColor}" opacity="0.1"/>
+      <path d="${d}" fill="none" stroke="${color}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+      ${dots}${vals}`;
+  }
+
+  const gridLines = [0.25, 0.5, 0.75, 1].map(f => {
+    const y   = PT + chartH - f * chartH;
+    const val = Math.round(f * maxVal);
+    return `<line x1="${PL}" y1="${y}" x2="${W-PR}" y2="${y}"
+               stroke="#E2E8F0" stroke-width="1" stroke-dasharray="4 3"/>
+            <text x="${PL}" y="${y-4}" font-family="JetBrains Mono,monospace"
+               font-size="9" fill="#94A3B8">${val}</text>`;
+  }).join('');
+
+  svg.innerHTML = gridLines
+    + makePath(seriesBlk,  '#E11D48', '#E11D48')
+    + makePath(seriesRule, '#2563EB', '#2563EB');
+
+  const step = Math.max(1, Math.floor(N/8));
+  labels.innerHTML = recent
+    .filter((_,i) => i % step === 0 || i === N-1)
+    .map(l => `<span>${(l.time||'').substring(0,5)}</span>`)
+    .join('');
+}
+
+async function load() {
+  try {
+    const r = await fetch('/api/rules');
+    const d = await r.json();
+    const rules = d.rules || [];
+    document.getElementById('rulesCount').textContent = rules.length;
+    const rb = document.getElementById('recentRulesBody');
+    if (rules.length) {
+      rb.innerHTML = `<table><tbody>${rules.slice(-5).reverse().map(r=>`
+        <tr>
+          <td class="mono">${r.src||'<span style="color:var(--text-muted)">any</span>'}</td>
+          <td class="mono">${r.dst||'<span style="color:var(--text-muted)">any</span>'}</td>
+          <td>${protoBadge(r.proto)}</td>
+          <td>${actionBadge(r.action)}</td>
+        </tr>`).join('')}</tbody></table>`;
+    }
+  } catch {}
+
+  try {
+    const r    = await fetch('/api/logs');
+    const d    = await r.json();
+    const logs = d.logs || [];
+    const blocked = logs.filter(l => l.event === 'Traffic Blocked').length;
+    document.getElementById('blockedCount').textContent = blocked;
+    document.getElementById('logCount').textContent     = logs.length;
+
+    const lb = document.getElementById('recentLogsBody');
+    if (logs.length) {
+      lb.innerHTML = `<table><tbody>${logs.slice(-5).reverse().map(l=>`
+        <tr>
+          <td style="font-family:var(--font-mono);font-size:0.75rem;color:var(--text-muted);white-space:nowrap">${l.time}</td>
+          <td>${eventBadge(l.event)}</td>
+          <td style="font-size:0.78rem;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${l.details}</td>
+        </tr>`).join('')}</tbody></table>`;
+    }
+
+    buildLineChart(logs, 'snapshotSvg', 'snapshotEmpty', 'snapshotLabels', 180);
+  } catch {}
+
+  document.getElementById('lastUpdated').textContent = 'Updated ' + new Date().toLocaleTimeString();
+}
+
+async function checkController() {
+    try {
+        const r = await fetch('/api/health');
+        const d = await r.json();
+        if (d.status === 'online') {
+            document.getElementById('ctrlStatus').textContent = 'Online';
+            document.getElementById('ctrlStatus').style.color = 'var(--emerald)';
+            document.getElementById('ctrlDot').className      = 'dot';
+            document.getElementById('ctrlText').textContent   = 'Controller online';
+        } else { throw new Error(); }
+    } catch {
+        document.getElementById('ctrlStatus').textContent = 'Offline';
+        document.getElementById('ctrlStatus').style.color = 'var(--rose)';
+        document.getElementById('ctrlDot').className      = 'dot offline';
+        document.getElementById('ctrlText').textContent   = 'Controller offline';
+    }
+}
+
+load();
+setInterval(load, 10000);
+
+checkController();
+setInterval(checkController, 5000);
+</script>
+</body>
+</html>

@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SDN Firewall — Monitoring</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+<aside class="sidebar">
+  <div class="sidebar-brand">
+    <div class="brand-icon">🛡️</div>
+    <div class="brand-name">SDN Firewall</div>
+    <div class="brand-sub">OpenFlow 1.3 · Ryu</div>
+  </div>
+  <nav class="sidebar-nav">
+    <div class="nav-section-label">Main Menu</div>
+    <a href="/" class="nav-link"><span class="nav-icon">📊</span> Dashboard</a>
+    <a href="/policies" class="nav-link"><span class="nav-icon">🔒</span> Policies</a>
+    <a href="/monitoring" class="nav-link active"><span class="nav-icon">📡</span> Monitoring</a>
+    <a href="/logs" class="nav-link"><span class="nav-icon">📋</span> Event Logs</a>
+    <a href="/about" class="nav-link"><span class="nav-icon">ℹ️</span> About</a>
+  </nav>
+  <div class="sidebar-footer">
+    <div class="status-dot">
+      <div class="dot" id="ctrlDot"></div>
+      <span id="ctrlText">Checking...</span>
+    </div>
+  </div>
+</aside>
+
+<main class="content">
+  <div class="topbar">
+    <span class="topbar-title">Traffic Monitoring</span>
+    <span class="topbar-meta" id="lastUpdated">Auto-refresh every 10s</span>
+  </div>
+
+  <div class="page-body">
+
+    <div class="page-header">
+      <h1 class="page-heading">Traffic Monitoring</h1>
+      <p class="page-sub">Live overview of network activity, blocked events, and rule enforcement.</p>
+    </div>
+
+    <!-- Stats -->
+    <div class="stats-grid section">
+      <div class="stat-card blue">
+        <div class="stat-bg-icon">📋</div>
+        <div class="stat-label">Total Events</div>
+        <div class="stat-value blue" id="totalEvents">—</div>
+        <div class="stat-sub">All security events</div>
+      </div>
+      <div class="stat-card red">
+        <div class="stat-bg-icon">🚫</div>
+        <div class="stat-label">Blocked Traffic</div>
+        <div class="stat-value red" id="blockedEvents">—</div>
+        <div class="stat-sub">Real packets dropped</div>
+      </div>
+      <div class="stat-card cyan">
+        <div class="stat-bg-icon">🔒</div>
+        <div class="stat-label">Active Rules</div>
+        <div class="stat-value cyan" id="activeRules">—</div>
+        <div class="stat-sub">OpenFlow rules installed</div>
+      </div>
+      <div class="stat-card amber">
+        <div class="stat-bg-icon">📝</div>
+        <div class="stat-label">Rule Changes</div>
+        <div class="stat-value amber" id="ruleChanges">—</div>
+        <div class="stat-sub">Add / Edit / Delete</div>
+      </div>
+    </div>
+
+    <!-- Line Chart -->
+    <div class="card section">
+      <div class="card-header">
+        <div class="card-title"><span class="card-title-icon">📈</span> Event Timeline</div>
+        <span style="font-size:0.72rem;color:var(--text-muted)">Cumulative count over last 20 events</span>
+      </div>
+      <div class="traffic-legend">
+        <div class="legend-item">
+          <div class="legend-dot" style="background:var(--rose)"></div>Blocked Traffic
+        </div>
+        <div class="legend-item">
+          <div class="legend-dot" style="background:var(--blue)"></div>Rule Changes
+        </div>
+      </div>
+      <div style="width:100%;overflow:hidden">
+        <svg id="timelineSvg" width="100%" height="200" viewBox="0 0 800 200"
+             preserveAspectRatio="none" style="display:block"></svg>
+      </div>
+      <div id="timelineEmpty" style="text-align:center;padding:40px;color:var(--text-muted);font-size:0.85rem;display:none">
+        No events recorded yet.
+      </div>
+      <!-- X axis labels -->
+      <div id="timelineLabels" style="display:flex;justify-content:space-between;padding:4px 0 0;font-family:var(--font-mono);font-size:0.6rem;color:var(--text-muted)"></div>
+    </div>
+
+    <!-- Breakdown + Protocol -->
+    <div class="grid-2 section">
+
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title"><span class="card-title-icon">📊</span> Event Breakdown</div>
+        </div>
+        <div id="eventBreakdown">
+          <div class="empty-state"><div class="empty-state-text">No data yet.</div></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title"><span class="card-title-icon">🔌</span> Protocol Distribution</div>
+          <span style="font-size:0.72rem;color:var(--text-muted)">From active rules</span>
+        </div>
+        <div id="protocolBreakdown">
+          <div class="empty-state"><div class="empty-state-text">No rules yet.</div></div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Block Report -->
+    <div class="card section">
+      <div class="card-header">
+        <div class="card-title"><span class="card-title-icon">🚫</span> Block Report</div>
+        <span id="blockMeta" style="font-family:var(--font-mono);font-size:0.72rem;color:var(--text-muted)"></span>
+      </div>
+      <div class="table-wrapper">
+        <table>
+          <thead>
+            <tr><th>Time</th><th>Src IP</th><th>Dst IP</th><th>Protocol</th><th>Src Port</th><th>Dst Port</th></tr>
+          </thead>
+          <tbody id="blockTable">
+            <tr><td colspan="6">
+              <div class="empty-state">
+                <div class="empty-state-icon">🚫</div>
+                <div class="empty-state-text">No blocked traffic recorded yet.</div>
+              </div>
+            </td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Active Rules Summary -->
+    <div class="card section">
+      <div class="card-header">
+        <div class="card-title"><span class="card-title-icon">🔒</span> Active Rules Summary</div>
+        <a href="/policies" class="btn btn-ghost btn-sm">Manage Rules</a>
+      </div>
+      <div class="table-wrapper">
+        <table>
+          <thead>
+            <tr><th>#</th><th>Source IP</th><th>Destination IP</th><th>Protocol</th><th>Action</th><th>Priority</th></tr>
+          </thead>
+          <tbody id="rulesTable">
+            <tr><td colspan="6">
+              <div class="empty-state"><div class="empty-state-text">No rules configured.</div></div>
+            </td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+</main>
+
+<script>
+function protoBadge(p) {
+  const m = {tcp:'badge-tcp',udp:'badge-udp',icmp:'badge-icmp'};
+  return `<span class="badge ${m[p]||'badge-info'}">${p||'any'}</span>`;
+}
+function actionBadge(a) {
+  return a==='block'
+    ? '<span class="badge badge-block">⛔ block</span>'
+    : '<span class="badge badge-allow">✅ allow</span>';
+}
+
+// ── SVG Line Chart ──
+function buildLineChart(logs) {
+  const svg    = document.getElementById('timelineSvg');
+  const empty  = document.getElementById('timelineEmpty');
+  const labels = document.getElementById('timelineLabels');
+
+  if (!logs.length) {
+    svg.style.display   = 'none';
+    empty.style.display = 'block';
+    labels.innerHTML    = '';
+    return;
+  }
+
+  svg.style.display   = 'block';
+  empty.style.display = 'none';
+
+  const W = 800, H = 200;
+  const PL = 8, PR = 8, PT = 16, PB = 24;
+  const chartW = W - PL - PR;
+  const chartH = H - PT - PB;
+
+  // Build cumulative series over the last 20 events
+  const recent  = logs.slice(-20);
+  const N       = recent.length;
+  let   cumBlk  = 0, cumRule = 0;
+  const seriesBlk  = [];
+  const seriesRule = [];
+
+  recent.forEach((log, i) => {
+    if (log.event === 'Traffic Blocked') cumBlk++;
+    else cumRule++;
+    seriesBlk.push({  i, v: cumBlk,  t: log.time });
+    seriesRule.push({ i, v: cumRule, t: log.time });
+  });
+
+  const maxVal = Math.max(cumBlk, cumRule, 1);
+
+  function xPos(i) { return PL + (i / Math.max(N - 1, 1)) * chartW; }
+  function yPos(v) { return PT + chartH - (v / maxVal) * chartH; }
+
+  function makePath(series, color, fillColor) {
+    if (series.length < 2) {
+      // single point — draw a dot
+      const x = xPos(series[0].i);
+      const y = yPos(series[0].v);
+      return `<circle cx="${x}" cy="${y}" r="5" fill="${color}" opacity="0.9"/>`;
+    }
+    // line path
+    let d = `M ${xPos(series[0].i)} ${yPos(series[0].v)}`;
+    for (let k = 1; k < series.length; k++) {
+      const x0 = xPos(series[k-1].i), y0 = yPos(series[k-1].v);
+      const x1 = xPos(series[k].i),   y1 = yPos(series[k].v);
+      const cx  = (x0 + x1) / 2;
+      d += ` C ${cx} ${y0} ${cx} ${y1} ${x1} ${y1}`;
+    }
+    // area fill
+    const lastX = xPos(series[series.length-1].i);
+    const firstX = xPos(series[0].i);
+    const baseY  = PT + chartH;
+    const fill   = d + ` L ${lastX} ${baseY} L ${firstX} ${baseY} Z`;
+    // dots
+    const dots = series.map(p =>
+      `<circle cx="${xPos(p.i)}" cy="${yPos(p.v)}" r="4" fill="${color}" stroke="white" stroke-width="2"/>`
+    ).join('');
+    // value labels on dots
+    const vals = series.map(p =>
+      `<text x="${xPos(p.i)}" y="${yPos(p.v)-10}" text-anchor="middle"
+        font-family="JetBrains Mono,monospace" font-size="10" fill="${color}" font-weight="600">${p.v}</text>`
+    ).join('');
+
+    return `
+      <path d="${fill}" fill="${fillColor}" opacity="0.12"/>
+      <path d="${d}" fill="none" stroke="${color}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+      ${dots}${vals}`;
+  }
+
+  // Y axis grid lines
+  const gridLines = [0.25, 0.5, 0.75, 1].map(f => {
+    const y   = PT + chartH - f * chartH;
+    const val = Math.round(f * maxVal);
+    return `<line x1="${PL}" y1="${y}" x2="${W-PR}" y2="${y}"
+               stroke="#E2E8F0" stroke-width="1" stroke-dasharray="4 3"/>
+            <text x="${PL}" y="${y-4}" font-family="JetBrains Mono,monospace"
+               font-size="9" fill="#94A3B8">${val}</text>`;
+  }).join('');
+
+  svg.innerHTML = `
+    ${gridLines}
+    ${makePath(seriesBlk,  '#E11D48', '#E11D48')}
+    ${makePath(seriesRule, '#2563EB', '#2563EB')}
+  `;
+
+  // X labels — show every label if space allows
+  const step = Math.max(1, Math.floor(N / 8));
+  labels.innerHTML = recent
+    .filter((_, i) => i % step === 0 || i === N - 1)
+    .map(l => `<span>${(l.time||'').substring(0,5)}</span>`)
+    .join('');
+}
+
+function buildEventBreakdown(logs) {
+  const counts = {};
+  logs.forEach(l => { counts[l.event] = (counts[l.event]||0)+1; });
+  const el    = document.getElementById('eventBreakdown');
+  const total = logs.length;
+  if (!total) {
+    el.innerHTML = '<div class="empty-state"><div class="empty-state-text">No data yet.</div></div>';
+    return;
+  }
+  const colors = {
+    'Traffic Blocked': 'var(--rose)',
+    'Rule Added':      'var(--blue)',
+    'Rule Deleted':    'var(--slate)',
+    'Rule Modified':   'var(--cyan)',
+  };
+  el.innerHTML = Object.entries(counts).sort((a,b)=>b[1]-a[1]).map(([name,count])=>{
+    const pct   = Math.round(count/total*100);
+    const color = colors[name] || 'var(--slate)';
+    return `<div class="progress-row">
+      <div class="progress-label">
+        <span class="progress-name">${name}</span>
+        <span class="progress-val" style="color:${color}">${count} &nbsp;(${pct}%)</span>
+      </div>
+      <div class="progress-track">
+        <div class="progress-fill" style="width:${pct}%;background:${color}"></div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function buildProtocolBreakdown(rules) {
+  const counts = {tcp:0, udp:0, icmp:0};
+  rules.forEach(r => { if (r.proto in counts) counts[r.proto]++; });
+  const total = rules.length || 1;
+  const el    = document.getElementById('protocolBreakdown');
+  if (!rules.length) {
+    el.innerHTML = '<div class="empty-state"><div class="empty-state-text">No rules yet.</div></div>';
+    return;
+  }
+  const colors = {tcp:'var(--blue)', udp:'var(--cyan)', icmp:'var(--amber)'};
+  el.innerHTML = Object.entries(counts).map(([proto, count]) => {
+    const pct   = Math.round(count/total*100);
+    const color = colors[proto];
+    return `<div class="progress-row">
+      <div class="progress-label">
+        <span>${protoBadge(proto)}</span>
+        <span class="progress-val" style="color:${color}">${count} rules &nbsp;(${pct}%)</span>
+      </div>
+      <div class="progress-track">
+        <div class="progress-fill" style="width:${pct}%;background:${color}"></div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+async function load() {
+  try {
+    const r    = await fetch('/api/logs');
+    const d    = await r.json();
+    const logs = d.logs || [];
+
+    const blocked  = logs.filter(l => l.event === 'Traffic Blocked');
+    const ruleEvts = logs.filter(l => l.event.includes('Rule'));
+
+    document.getElementById('totalEvents').textContent   = logs.length;
+    document.getElementById('blockedEvents').textContent = blocked.length;
+    document.getElementById('ruleChanges').textContent   = ruleEvts.length;
+    document.getElementById('lastUpdated').textContent   = 'Updated ' + new Date().toLocaleTimeString();
+
+    buildLineChart(logs);
+    buildEventBreakdown(logs);
+
+    // Block report table — show detailed packet info
+    document.getElementById('blockMeta').textContent = `${blocked.length} entries`;
+    const tbody = document.getElementById('blockTable');
+    if (blocked.length) {
+      tbody.innerHTML = [...blocked].reverse().map(log => `
+        <tr>
+          <td style="font-family:var(--font-mono);font-size:0.78rem;color:var(--text-muted);white-space:nowrap">${log.time}</td>
+          <td class="mono">${log.src_ip || '—'}</td>
+          <td class="mono">${log.dst_ip || '—'}</td>
+          <td>${protoBadge(log.protocol)}</td>
+          <td class="mono" style="color:var(--text-muted)">${log.src_port || '—'}</td>
+          <td class="mono" style="color:var(--text-muted)">${log.dst_port || '—'}</td>
+        </tr>`).join('');
+    } else {
+      tbody.innerHTML = `<tr><td colspan="6"><div class="empty-state">
+        <div class="empty-state-icon">🚫</div>
+        <div class="empty-state-text">No blocked traffic recorded yet.</div>
+      </div></td></tr>`;
+    }
+  } catch {}
+
+  try {
+    const r     = await fetch('/api/rules');
+    const d     = await r.json();
+    const rules = d.rules || [];
+    document.getElementById('activeRules').textContent = rules.length;
+    buildProtocolBreakdown(rules);
+
+    const rtb = document.getElementById('rulesTable');
+    if (rules.length) {
+      rtb.innerHTML = rules.map((r, i) => `
+        <tr>
+          <td class="mono" style="color:var(--text-muted)">${i+1}</td>
+          <td class="mono">${r.src || '<span style="color:var(--text-muted)">any</span>'}</td>
+          <td class="mono">${r.dst || '<span style="color:var(--text-muted)">any</span>'}</td>
+          <td>${protoBadge(r.proto)}</td>
+          <td>${actionBadge(r.action)}</td>
+          <td class="mono" style="color:var(--text-muted)">${r.priority || '—'}</td>
+        </tr>`).join('');
+    } else {
+      document.getElementById('rulesTable').innerHTML =
+        '<tr><td colspan="6"><div class="empty-state"><div class="empty-state-text">No rules configured.</div></div></td></tr>';
+    }
+  } catch {}
+}
+
+async function checkController() {
+    try {
+        const r = await fetch('/api/health');
+        const d = await r.json();
+        if (d.status === 'online') {
+            document.getElementById('ctrlDot').className    = 'dot';
+            document.getElementById('ctrlText').textContent = 'Controller online';
+        } else { throw new Error(); }
+    } catch {
+        document.getElementById('ctrlDot').className    = 'dot offline';
+        document.getElementById('ctrlText').textContent = 'Controller offline';
+    }
+}
+
+load();
+setInterval(load, 10000);
+
+checkController();
+setInterval(checkController, 5000);
+
+</script>
+</body>
+</html>

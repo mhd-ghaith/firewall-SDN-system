@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SDN Firewall — Event Logs</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+<aside class="sidebar">
+  <div class="sidebar-brand">
+    <div class="brand-icon">🛡️</div>
+    <div class="brand-name">SDN Firewall</div>
+    <div class="brand-sub">OpenFlow 1.3 · Ryu</div>
+  </div>
+  <nav class="sidebar-nav">
+    <div class="nav-section-label">Main Menu</div>
+    <a href="/" class="nav-link"><span class="nav-icon">📊</span> Dashboard</a>
+    <a href="/policies" class="nav-link"><span class="nav-icon">🔒</span> Policies</a>
+    <a href="/monitoring" class="nav-link"><span class="nav-icon">📡</span> Monitoring</a>
+    <a href="/logs" class="nav-link active"><span class="nav-icon">📋</span> Event Logs</a>
+    <a href="/about" class="nav-link"><span class="nav-icon">ℹ️</span> About</a>
+  </nav>
+  <div class="sidebar-footer">
+    <div class="status-dot">
+      <div class="dot" id="ctrlDot"></div>
+      <span id="ctrlText">Checking...</span>
+    </div>
+  </div>
+</aside>
+
+<main class="content">
+  <div class="topbar">
+    <span class="topbar-title">Event Logs</span>
+    <span class="topbar-meta" id="logMeta">—</span>
+  </div>
+
+  <div class="page-body">
+
+    <div class="page-header">
+      <h1 class="page-heading">Security Event Log</h1>
+      <p class="page-sub">Complete record of all firewall activity — rule changes and blocked traffic.</p>
+    </div>
+
+    <!-- Stats -->
+    <div class="stats-grid section" style="grid-template-columns:repeat(auto-fit,minmax(160px,1fr))">
+      <div class="stat-card blue">
+        <div class="stat-label">Total Events</div>
+        <div class="stat-value blue" id="totalCount">—</div>
+      </div>
+      <div class="stat-card red">
+        <div class="stat-label">Blocked</div>
+        <div class="stat-value red" id="blockedCount">—</div>
+      </div>
+      <div class="stat-card cyan">
+        <div class="stat-label">Rule Changes</div>
+        <div class="stat-value cyan" id="ruleCount">—</div>
+      </div>
+    </div>
+
+    <!-- Filter + Clear -->
+    <div class="card section">
+      <div style="display:flex;align-items:flex-end;gap:12px;flex-wrap:wrap">
+        <div class="form-group" style="max-width:220px;min-width:160px">
+          <label class="form-label">Filter by event</label>
+          <select id="filterType" onchange="renderLogs()">
+            <option value="all">All Events</option>
+            <option value="Traffic Blocked">Blocked Traffic</option>
+            <option value="Rule Added">Rule Added</option>
+            <option value="Rule Deleted">Rule Deleted</option>
+            <option value="Rule Modified">Rule Modified</option>
+          </select>
+        </div>
+        <button class="btn btn-danger" style="margin-bottom:1px" onclick="clearLogs()">🗑 Clear All Logs</button>
+      </div>
+    </div>
+
+    <!-- Logs Table -->
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title"><span class="card-title-icon">📋</span> Events</div>
+        <span id="shownCount" style="font-family:var(--font-mono);font-size:0.75rem;color:var(--text-muted)"></span>
+      </div>
+      <div class="table-wrapper">
+        <table>
+          <thead>
+            <tr>
+              <th>Time</th>
+              <th>Event</th>
+              <th>Details</th>
+            </tr>
+          </thead>
+          <tbody id="logsTable">
+            <tr><td colspan="3">
+              <div class="empty-state">
+                <div class="empty-state-icon">📋</div>
+                <div class="empty-state-text">No events recorded yet.</div>
+              </div>
+            </td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+</main>
+
+<script>
+let allLogs = [];
+
+function eventBadge(e) {
+  if (e === 'Traffic Blocked') return `<span class="badge badge-block">⛔ ${e}</span>`;
+  if (e === 'Rule Added')      return `<span class="badge badge-allow">➕ ${e}</span>`;
+  if (e === 'Rule Deleted')    return `<span class="badge badge-info">🗑 ${e}</span>`;
+  if (e === 'Rule Modified')   return `<span class="badge badge-tcp">✏️ ${e}</span>`;
+  return `<span class="badge badge-info">${e}</span>`;
+}
+
+function renderLogs() {
+  const filter = document.getElementById('filterType').value;
+  const logs   = filter === 'all' ? allLogs : allLogs.filter(l => l.event === filter);
+  const tbody  = document.getElementById('logsTable');
+  document.getElementById('shownCount').textContent = `${logs.length} entries`;
+
+  if (!logs.length) {
+    tbody.innerHTML = `<tr><td colspan="3"><div class="empty-state">
+      <div class="empty-state-icon">📋</div>
+      <div class="empty-state-text">No events match this filter.</div>
+    </div></td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = [...logs].reverse().map(log => `
+    <tr>
+      <td style="font-family:var(--font-mono);font-size:0.78rem;color:var(--text-muted);white-space:nowrap">${log.time}</td>
+      <td>${eventBadge(log.event)}</td>
+      <td style="font-size:0.82rem">${log.details}</td>
+    </tr>`).join('');
+}
+
+async function fetchLogs() {
+  try {
+    const r    = await fetch('/api/logs');
+    const data = await r.json();
+    allLogs    = data.logs || [];
+
+    document.getElementById('totalCount').textContent   = allLogs.length;
+    document.getElementById('blockedCount').textContent = allLogs.filter(l=>l.event==='Traffic Blocked').length;
+    document.getElementById('ruleCount').textContent    = allLogs.filter(l=>l.event.includes('Rule')).length;
+    document.getElementById('logMeta').textContent      = `${allLogs.length} events · ${new Date().toLocaleTimeString()}`;
+    renderLogs();
+  } catch {}
+}
+
+async function clearLogs() {
+  if (!confirm('Clear all event logs? This cannot be undone.')) return;
+  await fetch('/api/logs/clear', { method: 'POST' });
+  allLogs = [];
+  document.getElementById('totalCount').textContent   = '0';
+  document.getElementById('blockedCount').textContent = '0';
+  document.getElementById('ruleCount').textContent    = '0';
+  renderLogs();
+}
+
+async function checkController() {
+    try {
+        const r = await fetch('/api/health');
+        const d = await r.json();
+        if (d.status === 'online') {
+            document.getElementById('ctrlDot').className    = 'dot';
+            document.getElementById('ctrlText').textContent = 'Controller online';
+        } else { throw new Error(); }
+    } catch {
+        document.getElementById('ctrlDot').className    = 'dot offline';
+        document.getElementById('ctrlText').textContent = 'Controller offline';
+    }
+}
+
+fetchLogs();
+setInterval(fetchLogs, 8000);
+
+checkController();
+setInterval(checkController, 5000);
+</script>
+</body>
+</html>
