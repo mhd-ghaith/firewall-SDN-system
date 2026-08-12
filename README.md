@@ -101,7 +101,9 @@ pip install docker
 deactivate
 ```
 ### 5. Pull Docker image
-`sudo docker pull iwaseyusuke/mininet`
+```bash
+sudo docker pull iwaseyusuke/mininet
+```
 
 ## Running the System
 
