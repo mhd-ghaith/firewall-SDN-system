@@ -77,7 +77,9 @@ cd sdn-firewall
 ```
 
 ### 2. Install Ryu
-```sudo pip3 install ryu --break-system-packages```
+```bash
+sudo pip3 install ryu --break-system-packages
+```
 
 ### 3. Set up Flask virtual environment
 ```bash
