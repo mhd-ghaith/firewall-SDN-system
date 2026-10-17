@@ -35,11 +35,7 @@ The project uses Containernet to create a simulated network environment for expe
 - [Installation](#installation)
 - [Quick Start](#quick-start)
 - [Usage Example](#usage-example)
-- [Testing and Validation](#testing-and-validation)
 - [Database Schema](#database-schema)
-- [Security Considerations](#security-considerations)
-- [Limitations](#limitations)
-- [Roadmap](#roadmap)
 - [Contributing](#contributing)
 - [License](#license)
 
