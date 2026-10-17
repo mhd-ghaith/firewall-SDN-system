@@ -139,13 +139,33 @@ The architecture separates management, control, packet forwarding, and persisten
 
 ## Network Topology
 
-The project uses Containernet to create a configurable network environment for experimenting with SDN-based firewall policies.
+The network topology separates the simulated environment into a Demilitarized Zone (DMZ) and an Internal Network (IN). An attacker host is positioned outside these networks to support controlled security experiments.
 
-The topology is defined in `sdn_topology.py` and describes the simulated network devices and connections used for testing.
+### IP Addressing Plan
 
-This environment allows firewall policies to be evaluated under controlled conditions by generating traffic between selected hosts.
+| Network / Component | Host | IP Address |
+|---|---|---|
+| External / Attacker | Attacker host | `10.0.0.100` |
+| DMZ | Web Server 1 | `10.0.1.1` |
+| DMZ | Web Server 2 | `10.0.1.2` |
+| Internal Network | Application Server 1 | `10.0.2.1` |
+| Internal Network | Application Server 2 | `10.0.2.2` |
+| Internal Network | User Workstation 1 | `10.0.2.3` |
+| Internal Network | User Workstation 2 | `10.0.2.4` |
+| Internal Network | Database Server | `10.0.2.5` |
+
+### Network Segmentation
+
+- **External Network:** Contains the attacker host used to generate test traffic.
+- **DMZ (`10.0.1.0/24`):** Contains the two web servers, separated from the internal network.
+- **Internal Network (`10.0.2.0/24`):** Contains the application servers, user workstations, and database server.
+- **Firewall Components:** The diagram illustrates an external firewall and two internal firewalls controlling traffic between network segments.
+
+### Topology Diagram
 
 ![SDN Firewall Network Topology](docs/images/Topology.jpg)
+
+The topology is intended to support experiments involving traffic filtering, network segmentation, and access control between external, DMZ, and internal hosts.
 
 ## Technology Stack
 
@@ -346,6 +366,8 @@ The `logs` table stores security event information recorded by the system.
 ### Rule Statistics
 
 The `rule_stats` table stores the statistics maintained for firewall rules.
+
+### Entity Relationship Diagram
 
 ![Entity Relationship Diagram](docs/images/ERD.png)
 
