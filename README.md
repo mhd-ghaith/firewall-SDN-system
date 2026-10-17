@@ -1,165 +1,104 @@
 # SDN Firewall System
 
-A dynamic network firewall built on Software Defined Networking (SDN) principles,
-enabling real-time security policy management through a web interface.
+**A programmable network firewall powered by Software-Defined Networking (SDN).**
+
+The SDN Firewall System is a network security project that combines centralized firewall policy management with a web-based interface and an SDN controller.
+
+Built using Python, Flask, Ryu, OpenFlow 1.3, Open vSwitch, and SQLite, the system explores programmable traffic filtering, firewall rule management, and security event monitoring.
+
+The project uses Containernet to create a simulated network environment for experimenting with and evaluating firewall policies.
+
+<p align="center">
+  <img src="https://img.shields.io/badge/Python-blue?logo=python&logoColor=white" alt="Python">
+  <img src="https://img.shields.io/badge/Flask-black?logo=flask&logoColor=white" alt="Flask">
+  <img src="https://img.shields.io/badge/OpenFlow-1.3-orange" alt="OpenFlow 1.3">
+  <img src="https://img.shields.io/badge/SQLite-blue?logo=sqlite&logoColor=white" alt="SQLite">
+  <img src="https://img.shields.io/badge/License-MIT-green" alt="MIT License">
+</p>
+
+<p align="center">
+  <a href="https://github.com/mhd-ghaith/firewall-SDN-system">View Repository</a>
+  ·
+  <a href="https://github.com/mhd-ghaith/firewall-SDN-system/issues">Report a Bug</a>
+</p>
+
+## Table of Contents
+
+- [Overview](#overview)
+- [Key Features](#key-features)
+- [Screenshots](#screenshots)
+- [System Architecture](#system-architecture)
+- [Network Topology](#network-topology)
+- [Technology Stack](#technology-stack)
+- [Project Structure](#project-structure)
+- [Requirements](#requirements)
+- [Installation](#installation)
+- [Quick Start](#quick-start)
+- [Usage Example](#usage-example)
+- [Testing and Validation](#testing-and-validation)
+- [Database Schema](#database-schema)
+- [Security Considerations](#security-considerations)
+- [Limitations](#limitations)
+- [Roadmap](#roadmap)
+- [Contributing](#contributing)
+- [License](#license)
 
 ## Overview
 
-This project implements a centralized firewall using the Ryu SDN controller
-and OpenFlow 1.3 protocol. Security rules are pushed directly to Open vSwitch
-(OVS) switches, taking effect instantly across the entire network without
-requiring any restarts. All rules and events are persisted in a SQLite database,
-surviving controller restarts.
+Traditional network security configurations may require administrators to configure individual devices when traffic-filtering policies change. Software-Defined Networking (SDN) provides a programmable approach to network management by separating control logic from packet forwarding.
 
-## System Architecture
+The SDN Firewall System explores this approach by integrating a web-based management interface with a Ryu SDN controller and OpenFlow-compatible switches.
 
-[Web Browser] → [Flask Web UI :5000] → [Ryu REST API :8080] → [OVS Switches]
-OpenFlow 1.3
-[SQLite DB] ← firewall.db (rules + logs + rule_stats tables)
-[Containernet + Docker] ← Network simulation topology
+The application provides a centralized interface for managing supported firewall policies and viewing available monitoring information. The controller processes firewall policies and communicates with the network infrastructure to enforce the configured behavior.
 
-## Features
+Containernet provides a controlled environment for creating network topologies and experimenting with traffic-filtering scenarios.
 
-- Dynamic firewall rule management via web interface
-- Real-time rule enforcement using OpenFlow 1.3
-- Block/Allow rules based on source IP, destination IP, protocol, and ports
-- Priority-based rule conflict resolution (Block=200, Allow=100)
-- Persistent storage using SQLite — rules survive controller restarts
-- Security event logging with timestamps
-- Traffic monitoring with live SVG charts
-- Network simulation using Containernet and Docker
+### Project Objectives
 
-## Project Structure
+- Implement centralized firewall policy management.
+- Configure traffic-filtering rules through a web interface.
+- Enforce supported firewall policies using an SDN controller.
+- Store firewall rules and security events in SQLite.
+- Display available firewall and network monitoring information.
+- Evaluate firewall behavior through controlled network experiments.
 
-Firewall_with_SDN/
-├── controller/
-│   └── firewall.py          # Ryu SDN controller + REST API + SQLite
-└── webUI/
-├── app.py               # Flask web application
-├── static/
-│   ├── style.css        # UI styling
-│   └── main.js          # Frontend logic
-└── templates/
-├── dashboard.html   # Dashboard page
-├── policies.html    # Firewall policies management
-├── monitoring.html  # Traffic monitoring
-├── logs.html        # Security event logs
-└── about.html       # About page
-containernet/
-└── sdn_topology.py          # Network simulation topology
+This project is intended for educational use and experimentation with programmable network security.
 
-## Requirements
+## Key Features
 
-### System
-- Ubuntu 20.04 LTS
-- Python 3.8+
-- Docker 20.10+
-- Open vSwitch 2.13
+### Firewall Policy Management
 
-### Python Packages
-**Controller:**
-ryu==4.34
+- Manage firewall rules through a web interface.
+- Configure supported source and destination addresses.
+- Define protocol and port matching criteria where implemented.
+- Configure allow and block actions.
+- Use the rule-priority behavior implemented by the system.
 
-**Web UI:**
-flask==3.0.3
-requests==2.31.0
+### SDN-Based Enforcement
 
-**Containernet:**
-containernet
-docker
+- Integrate with the Ryu SDN controller.
+- Use OpenFlow 1.3 for communication with compatible switches.
+- Apply firewall policies through the controller's enforcement logic.
 
-## Installation
+### Monitoring and Logging
 
-### 1. Clone the repository
-```bash
-git clone https://github.com/YOUR_USERNAME/sdn-firewall.git
-cd sdn-firewall
-```
+- View available traffic and firewall statistics.
+- Inspect recorded security events.
+- Review rule-related statistics supported by the implementation.
 
-### 2. Install Ryu
-```bash
-sudo pip3 install ryu --break-system-packages
-```
+### Persistent Storage
 
-### 3. Set up Flask virtual environment
-```bash
-cd webUI
-python3 -m venv application
-source application/bin/activate
-pip install flask requests
-deactivate
-```
+- Store firewall rules in SQLite.
+- Persist supported security event records.
+- Maintain rule-related statistics where implemented.
 
-### 4. Install Containernet
-```bash
-cd ~/containernet
-python3 -m venv cont_env
-source cont_env/bin/activate
-pip install wheel setuptools --upgrade
-pip install . --no-build-isolation
-pip install docker
-deactivate
-```
-### 5. Pull Docker image
-```bash
-sudo docker pull iwaseyusuke/mininet
-```
+### Network Simulation
 
-## Running the System
+- Use Containernet to create a configurable network environment.
+- Experiment with simulated hosts and switches.
+- Evaluate firewall behavior using controlled network tests.
 
-Open three separate terminals:
+### Machine Learning Algorithms
 
-### Terminal 1 | Ryu Controller:
-```bash
-cd Firewall_with_SDN/controller
-ryu-manager --wsapi-port 8080 firewall.py
-```
-
-### Terminal 2 | Flask Web UI:
-```bash
-cd Firewall_with_SDN/Web_UI
-source application/bin/activate
-python3 app.py
-```
-
-### Terminal 3 | Containernet Topology:
-```bash
-cd containernet
-source cont_env/bin/activate
-sudo $(which python3) sdn_topology.py
-```
-
-Then open your browser at: http://127.0.0.1:5000
-
-## Network Topology
-
-h_attacker (10.0.0.100)
-      |
-      s1 (External Firewall)
-      |
-      s2 (DMZ Switch) ──── h_web1 (10.0.1.1)
-      |                └── h_web2 (10.0.1.2)
-      |
-      s3 (Internal Firewall 1)
-      |
-      s4 (Internal Switch) ──── h_app1  (10.0.2.1)
-      |                    ├── h_app2  (10.0.2.2)
-      |                    ├── h_work1 (10.0.2.3)
-      |                    ├── h_work2 (10.0.2.4)
-      |                    └── h_db    (10.0.2.5)
-      |
-      s5 (Internal Firewall 2)
-
-**Note:** The topology provided above is an example configuration used to demonstrate and test the system. Containernet allows you to modify the topology according to your requirements by changing the switches, hosts, links, IP addresses, and their connections in the topology file. You can add or remove hosts and switches, change the network structure, or assign different IP addresses, as long as the resulting topology is compatible with the firewall rules and controller configuration. This allows the system to be tested in different network scenarios without modifying the core firewall implementation.
-
-## Database Schema
-
-The system uses SQLite with three tables:
-
-| Table | Description |
-|-------|-------------|
-| rules | Stores firewall rules (src, dst, proto, sport, dport, action, priority) |
-| logs | Stores security events (rule_id, src_ip, dst_ip, protocol, action, timestamp) |
-| rule_stats | Tracks packet counts per rule for blocked traffic detection |
-
-
+- Train the dataset [CSE-CIC-IDS2018](https://www.kaggle.com/datasets/solarmainframe/ids-intrusion-csv) on 5 different algorithms for binary classification (malicious vs benign traffic).
+- Compare the results to conclude the best model.
